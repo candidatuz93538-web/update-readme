@@ -1,0 +1,134 @@
+import tkinter as tk
+from tkinter import ttk
+import random
+import numpy as np
+import pandas as pd
+
+
+# ============================================================
+#   FUNCIÓN PARA GENERAR JUGADORES
+# ============================================================
+def generar_jugadores():
+    global df
+
+    try:
+        num_jug = int(entry_jugadores.get())
+    except:
+        num_jug = 12
+
+    jugadores = []
+
+    for i in range(num_jug):
+        jugadores.append({
+            "jugador": f"Jugador {i+1}",
+            "edad": random.randint(16, 21),
+            "goles_90": random.uniform(0.0, 0.50),
+            "asist_90": random.uniform(0.0, 0.40),
+            "pase": random.uniform(70, 90),
+            "tackles": random.uniform(0.5, 2.5)
+        })
+
+    df = pd.DataFrame(jugadores)
+    mostrar_tabla(df)
+
+
+# ============================================================
+#   FUNCIÓN DE CRECIMIENTO
+# ============================================================
+def crecimiento_aleatorio(edad):
+    mu = (22 - edad) * 0.03
+    sd = 0.05
+
+    u1 = random.random()
+    u2 = random.random()
+    normal = ((-2 * np.log(u1)) ** 0.5) * np.cos(2 * np.pi * u2)
+
+    crecimiento = mu + sd * normal
+    return max(-0.25, min(crecimiento, 0.50))
+
+
+# ============================================================
+#   SIMULACIÓN
+# ============================================================
+def correr_simulacion():
+    simulaciones = 4000
+    resultados = []
+
+    for idx, row in df.iterrows():
+
+        scores = []
+
+        for _ in range(simulaciones):
+            g = crecimiento_aleatorio(row["edad"])
+
+            goles = row["goles_90"] * (1 + g)
+            asist = row["asist_90"] * (1 + g)
+            pase = row["pase"] * (1 + g)
+            tackles = row["tackles"] * (1 + g)
+
+            score = (goles * 60) + (asist * 40) + (pase * 0.7) + (tackles * 10)
+            scores.append(score)
+
+        scores = np.array(scores)
+
+        resultados.append({
+            "jugador": row["jugador"],
+            "score_prom": round(scores.mean(), 2),
+            "score_p5": round(np.percentile(scores, 5), 2),
+            "score_p95": round(np.percentile(scores, 95), 2),
+            "prob_exito(>=75)": round(np.mean(scores >= 75), 3)
+        })
+
+    tabla = pd.DataFrame(resultados).sort_values("prob_exito(>=75)", ascending=False)
+    mostrar_tabla(tabla)
+
+
+# ============================================================
+#   FUNCIÓN PARA MOSTRAR LA TABLA EN TKINTER
+# ============================================================
+def mostrar_tabla(dataframe):
+
+    for widget in frame_tabla.winfo_children():
+        widget.destroy()
+
+    tabla = ttk.Treeview(frame_tabla, columns=list(dataframe.columns), show="headings")
+    tabla.pack(fill="both", expand=True)
+
+    for col in dataframe.columns:
+        tabla.heading(col, text=col)
+        tabla.column(col, width=120)
+
+    for _, row in dataframe.iterrows():
+        tabla.insert("", "end", values=list(row))
+
+
+# ============================================================
+#   INTERFAZ TKINTER
+# ============================================================
+ventana = tk.Tk()
+ventana.title("Simulador de Talento Futbolístico")
+ventana.geometry("900x600")
+ventana.configure(bg="#e3e8ff")
+
+titulo = tk.Label(ventana, text="Simulador de Talento Futbolístico", font=("Arial", 20, "bold"), bg="#e3e8ff")
+titulo.pack(pady=10)
+
+frame_controles = tk.Frame(ventana, bg="#e3e8ff")
+frame_controles.pack(pady=5)
+
+tk.Label(frame_controles, text="Número de jugadores:", font=("Arial", 12), bg="#e3e8ff").grid(row=0, column=0, padx=5)
+
+entry_jugadores = tk.Entry(frame_controles, width=10)
+entry_jugadores.grid(row=0, column=1)
+entry_jugadores.insert(0, "12")
+
+btn_generar = tk.Button(frame_controles, text="Generar Jugadores", command=generar_jugadores, bg="#9cb5ff", font=("Arial", 11))
+btn_generar.grid(row=0, column=2, padx=10)
+
+btn_simular = tk.Button(frame_controles, text="Correr Simulación", command=correr_simulacion, bg="#8affc1", font=("Arial", 11))
+btn_simular.grid(row=0, column=3, padx=10)
+
+frame_tabla = tk.Frame(ventana, bg="white")
+frame_tabla.pack(fill="both", expand=True, padx=10, pady=10)
+
+ventana.mainloop()
